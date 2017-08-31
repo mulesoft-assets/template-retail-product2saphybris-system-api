@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" 
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" 
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:hybris="http://www.mulesoft.org/schema/mule/hybris"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" 
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/hybris http://www.mulesoft.org/schema/mule/hybris/current/mule-hybris.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    
+    <flow name="getCatalogsCache">
+        <choice doc:name="nocache param present?">
+            <when expression="#[ dw( ' inboundProperties.&quot;http.query.params&quot;.nocache? ' ) ]">
+                <flow-ref name="getCategories" doc:name="getCategories"/>
+            </when>
+            <otherwise>
+                <ee:cache doc:name="Cache">
+                    <flow-ref name="getCategories" doc:name="getCategories"/>
+                </ee:cache>
+            </otherwise>
+        </choice>
+    </flow>
+    
+    <flow name="getAllProductinfoCache">
+        <choice doc:name="nocache param present?">
+            <when expression="#[ dw( ' inboundProperties.&quot;http.query.params&quot;.nocache? ' ) ]">
+                <flow-ref name="getProducts" doc:name="getProducts"/>
+            </when>
+            <otherwise>
+                <ee:cache doc:name="Cache">
+                    <flow-ref name="getProducts" doc:name="getProducts"/>
+                </ee:cache>
+            </otherwise>
+        </choice>
+    </flow>
+    <sub-flow name="getCategories">
+        <hybris:get-catalogs config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" doc:name="Hybris OCC Connector"/>
+        <dw:transform-message doc:name="transform to required format">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var catalogId = p('hybris.catalog.id') //set statically to debug
+%var catalogData = (payload filter ($.id == catalogId))[0]
+
+%var categoriesRoot = (catalogData.catalogVersions filter ($.id == "Online"))[0].categories
+%var categoriesWithSubcategories = categoriesRoot filter (not $.subcategories  is :empty)
+
+%var firstLevelCategories = 
+categoriesRoot map ((category) -> {
+		identifier: category.id,
+		name: category.name,
+		description: category.name
+	})
+	
+%var secondLevelCategories = 
+	flatten (categoriesWithSubcategories map ((parentCategory) -> 
+		       parentCategory.subcategories map ((subcategory) ->  {
+					identifier:   subcategory.id,
+					parentId:     parentCategory.id,
+					name:         subcategory.name,
+					description:  subcategory.name
+				})
+		
+			)
+	)
+---
+firstLevelCategories ++ secondLevelCategories]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <sub-flow name="getProducts">
+        <hybris:search-products config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" query=" " doc:name="Get products/variants"/>
+        <splitter expression="#[payload]" doc:name="Splitter"/>
+        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" productCode="#[payload.code]" doc:name="Get product/variant details"/>
+        <dw:transform-message doc:name="Convert to Map">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload as :object { class : "java.util.HashMap" } ]]></dw:set-payload>
+        </dw:transform-message>
+        <collection-aggregator failOnTimeout="true" doc:name="Collection Aggregator"/>
+    </sub-flow>
+
+</mule>

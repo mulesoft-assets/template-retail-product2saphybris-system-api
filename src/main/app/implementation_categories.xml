@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" 
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" 
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" 
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" 
+	xmlns:hybris="http://www.mulesoft.org/schema/mule/hybris" 
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" 
+	xmlns="http://www.mulesoft.org/schema/mule/core" 
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/hybris http://www.mulesoft.org/schema/mule/hybris/current/mule-hybris.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    
+    <flow name="get:/categories:product-system-api-config">
+        <set-variable variableName="name" value="#[message.inboundProperties.'http.query.params'.name]" doc:name="Get name"/>
+        <flow-ref name="getCatalogsCache" doc:name="getCatalogsCache"/>
+        <dw:transform-message doc:name="Map Fields">
+            <dw:input-payload doc:sample="sample_data/json_1.json"/>
+            <dw:input-variable doc:sample="sample_data/string.dwl" variableName="name"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	categories:   payload
+	 filter (($.name != null) and (lower $.name contains lower flowVars.name))
+	 when flowVars.name != null 
+	 otherwise payload	 
+}			  
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Log Information"/>
+
+    </flow>
+    
+    <flow name="get:/categories/{categoryId}:product-system-api-config">
+        <set-variable variableName="categoryId" value="#[message.inboundProperties.'http.uri.params'.categoryId]" doc:name="Get categoryId"/>
+        <flow-ref name="getCatalogsCache" doc:name="getCatalogsCache"/>
+        <dw:transform-message doc:name="Filter by Id">
+            <dw:input-payload doc:sample="sample_data/json_2.json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var filtered = payload filter ($.identifier == flowVars.categoryId)
+---
+filtered[0] when not filtered  is :empty otherwise null]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="INFO" doc:name="Log Information"/>
+        <choice doc:name="Category found?">
+            <when expression="#[payload != null]">
+                <json:object-to-json-transformer doc:name="Object to JSON"/>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="404 Not Found">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"message": "Resource not found."
+}]]></dw:set-payload>
+                    <dw:set-property propertyName="http.status"><![CDATA[%dw 1.0
+%output application/java
+---
+404]]></dw:set-property>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+
+    </flow>
+    
+    <flow name="get:/categories/{categoryId}/products:product-system-api-config">
+        <set-variable variableName="categoryId" value="#[message.inboundProperties.'http.uri.params'.categoryId]" doc:name="Get categoryId"/>
+        <flow-ref name="getAllProductinfoCache" doc:name="getAllProductinfoCache"/>
+        <dw:transform-message doc:name="Map to required structure">
+            <dw:input-payload doc:sample="sample_data\list_unknown.dwl"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var imageData = read(p('imageData'), "application/json")
+---
+{
+	products:	payload[?($.categories.code != null)] 
+		filter ($.categories.code contains flowVars.categoryId) 
+		map 
+		using(productId = $.baseProduct when $.baseProduct != null otherwise $.code)
+		{
+			brand:            $.manufacturer,
+			identifier:       productId,
+			model:            $.name,
+			rating:           $.averageRating,
+			description:      $.description replace /\<p\>|\<\/p\>/ with "",
+			pictures:         imageData.products[productId].images default [],
+			price:{
+				amount:{
+					currency:           $.price.currencyIso,
+					currencyValue:      $.price.value,
+					name:               "Amount"
+				},
+				salesUnit:{
+					code:     "EA",
+					name:     "EACH"
+				}
+			}
+		} 
+		groupBy $.identifier 
+		map $[0]	
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+    </flow>
+   
+</mule>

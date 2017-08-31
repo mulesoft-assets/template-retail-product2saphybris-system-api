@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" 
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" 
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" 
+	xmlns:hybris="http://www.mulesoft.org/schema/mule/hybris" 
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" 
+	xmlns="http://www.mulesoft.org/schema/mule/core" 
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/hybris http://www.mulesoft.org/schema/mule/hybris/current/mule-hybris.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    
+    <flow name="get:/products:product-system-api-config">
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="minPrice" value="#[message.inboundProperties.'http.query.params'.minPrice]"/>
+            <add-message-property key="maxPrice" value="#[message.inboundProperties.'http.query.params'.maxPrice]"/>
+            <add-message-property key="name" value="#[message.inboundProperties.'http.query.params'.name]"/>
+        </message-properties-transformer>
+        <flow-ref name="getAllProductinfoCache" doc:name="getAllProductinfoCache"/>
+        <dw:transform-message doc:name="filter by maxPrice">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ($.price.value != null and $.price.value <= flowVars.maxPrice) 
+when flowVars.maxPrice != null 
+otherwise payload]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="filter by minPrice">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ( $.price.value != null and $.price.value >= flowVars.minPrice) 
+when flowVars.minPrice != null 
+otherwise payload]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="filter by name">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload filter ( ($.name != null) and (lower $.name contains lower flowVars.name) ) 
+when flowVars.name != null 
+otherwise payload]]></dw:set-payload>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Final mapping">
+            <dw:input-payload doc:sample="sample_data/json_3.json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json 
+%var imageData = read(p('imageData'), "application/json")
+
+%var productsThatHaveVariants = payload 
+	filter $.baseProduct != null 
+	groupBy $.baseProduct
+	map	using (first = $[0]) {
+        brand:        first.manufacturer,
+        identifier:   first.baseProduct,
+        model:        first.name,
+        rating:       first.averageRating,
+        description:  first.description replace /\<p\>|\<\/p\>/ with "",
+        pictures:     imageData.products[first.baseProduct].images,
+        price:{
+            amount:{
+                currency:      first.price.currencyIso,
+                currencyValue: first.price.value,
+                name:          "Amount"
+            },
+            salesUnit: {
+                code:   "EA",
+                name:   "EACH"
+            }
+        }
+    }
+    
+%var productsWithoutVariants = payload 
+	filter $.baseProduct == null 
+	map	{
+        brand:          $.manufacturer,
+        identifier:     $.code,
+        model:          $.name,
+        rating:         $.averageRating,
+        description:    $.description replace /\<p\>|\<\/p\>/ with "",
+        pictures:       imageData.products[$.code].images,
+        price:{
+            amount:{
+                currency:       $.price.currencyIso,
+                currencyValue:  $.price.value,
+                name:           "Amount"
+             },
+             salesUnit:{
+                code:   "EA",
+                name:   "EACH"
+             }
+        }
+	}
+    
+---
+{
+	products: flatten (productsWithoutVariants + productsThatHaveVariants)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Log Information"/>
+
+    </flow>
+    <flow name="get:/products/{productId}:product-system-api-config">
+        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" productCode="#[flowVars.productId]" doc:name="Hybris OCC Connector"/>
+        <dw:transform-message doc:name="Map Fields">
+            <dw:input-payload doc:sample="sample_data\ProductWsDTO_2.dwl"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var imageData = read(p('imageData'), "application/json")
+---
+{
+	brand:                   payload.manufacturer,
+	identifier:              payload.code,
+	categoryId:              payload.categories.code,
+	model:                   payload.name,
+	rating:                  payload.averageRating as :number,
+	description:             payload.description replace /\<p\>|\<\/p\>/ with "",
+	pictures:                imageData.products[payload.code].images,
+	price:{
+		amount:{
+			currency:        payload.price.currencyIso,
+			currencyValue:   payload.price.value,
+			name:            "Amount"
+		},
+	    salesUnit:{
+		    code:            "EA",
+		    name:            "EACH"
+	}
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Log Information"/>
+    </flow>
+    
+    <flow name="get:/products/{productId}/variants:product-system-api-config">
+        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" productCode="#[flowVars.productId]" doc:name="Hybris OCC Connector" doc:description="When Id is not found, connector throws exception org.mule.modules.hybris.exception.HybrisConnectorException"/>
+        <dw:transform-message doc:name="Map Fields">
+            <dw:input-payload doc:sample="sample_data/json.json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var imageData = read(p('imageData'), "application/json")
+---
+using(productId = payload.code)
+variants: payload.variantOptions map {
+	productId:             productId,
+	identifier:            $.code,
+	pictures:              imageData.products[productId].variants[$.code].images,
+	configuration:         $.variantOptionQualifiers map (variantOption) -> {
+		characteristic:{
+			code:          variantOption.qualifier,
+			description:   variantOption.name,
+			name:          variantOption.name
+		},
+		characteristicValue:{
+			code:          variantOption.value,
+			name:          variantOption.value
+		}
+	} 	
+} when payload.variantOptions != null otherwise []]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger"/>
+
+    </flow>
+    <flow name="get:/products/{productId}/variants/{variantId}:product-system-api-config">
+        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" productCode="#[flowVars.productId]" doc:name="Hybris OCC Connector"/>
+<!--         <enricher source="#[payload]" target="#[flowVars.existing_variantIDs]" doc:name="Message Enricher"> -->
+<!--             <dw:transform-message doc:name="Get variant ID's"> -->
+<!--                 <dw:set-payload><![CDATA[%dw 1.0 -->
+<!-- %output application/java -->
+<!-- - - - -->
+<!-- payload.variantOptions map $.code]]></dw:set-payload> -->
+<!--             </dw:transform-message> -->
+<!--         </enricher> -->
+        <choice doc:name="Does variant exist?">
+            <when expression="#[ dw(' (payload.variantOptions != null) and (payload.variantOptions.*code contains flowVars.variantId) ') ]">
+                <dw:transform-message doc:name="Map Fields">
+                    <dw:input-payload doc:sample="sample_data\ProductWsDTO_3.dwl"/>
+                    <dw:input-variable doc:sample="sample_data\string_4.dwl" variableName="variantId"/>
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload.variantOptions filter ($.code == flowVars.variantId) map 
+using (productId = payload.code)
+{
+	productId:            productId,
+	identifier:           $.code,
+	pictures:             imageData.products[productId].variants[$.code].images,
+	configuration:        $.variantOptionQualifiers map (variantOption) -> {
+		characteristic:{
+			code:         variantOption.qualifier,
+			description:  variantOption.name,
+			name:         variantOption.name
+		},
+		characteristicValue:{
+			code:         variantOption.value,
+			name:         variantOption.value
+		}
+	} 	
+}]]></dw:set-payload>
+                </dw:transform-message>
+                <logger message="#[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Log Information"/>
+            </when>
+            <otherwise>
+                <dw:transform-message doc:name="404 Not Found">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"message": "Resource not found."
+}]]></dw:set-payload>
+                    <dw:set-property propertyName="http.status"><![CDATA[%dw 1.0
+%output application/java
+---
+404]]></dw:set-property>
+                </dw:transform-message>
+            </otherwise>
+        </choice>
+
+    </flow>
+
+    
+    
+</mule>
