@@ -90,7 +90,7 @@ filtered[0] when not filtered  is :empty otherwise null]]></dw:set-payload>
 			model:            $.name,
 			rating:           $.averageRating,
 			description:      $.description replace /\<p\>|\<\/p\>/ with "",
-			pictures:         imageData.products[productId].images default [],
+			pictures:         $.images when $.images != null otherwise [],
 			price:{
 				amount:{
 					currency:           $.price.currencyIso,

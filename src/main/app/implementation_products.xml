@@ -62,7 +62,7 @@ otherwise payload]]></dw:set-payload>
         model:        first.name,
         rating:       first.averageRating,
         description:  first.description replace /\<p\>|\<\/p\>/ with "",
-        pictures:     imageData.products[first.baseProduct].images,
+        pictures:     first.images when first.images != null otherwise [],
         price:{
             amount:{
                 currency:      first.price.currencyIso,
@@ -84,7 +84,7 @@ otherwise payload]]></dw:set-payload>
         model:          $.name,
         rating:         $.averageRating,
         description:    $.description replace /\<p\>|\<\/p\>/ with "",
-        pictures:       imageData.products[$.code].images,
+        pictures:       $.images when $.images != null otherwise [],
         price:{
             amount:{
                 currency:       $.price.currencyIso,
@@ -120,7 +120,7 @@ otherwise payload]]></dw:set-payload>
 	model:                   payload.name,
 	rating:                  payload.averageRating as :number,
 	description:             payload.description replace /\<p\>|\<\/p\>/ with "",
-	pictures:                imageData.products[payload.code].images,
+	pictures:                payload.images when payload.images != null otherwise [],
 	price:{
 		amount:{
 			currency:        payload.price.currencyIso,
@@ -148,7 +148,9 @@ using(productId = payload.code)
 variants: payload.variantOptions map {
 	productId:             productId,
 	identifier:            $.code,
-	pictures:              imageData.products[productId].variants[$.code].images,
+	pictures:              $.variantOptionQualifiers.image.url 
+                           when $.variantOptionQualifiers.image != null 
+                           otherwise [],
 	configuration:         $.variantOptionQualifiers map (variantOption) -> {
 		characteristic:{
 			code:          variantOption.qualifier,
@@ -173,12 +175,16 @@ variants: payload.variantOptions map {
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 ---
-payload.variantOptions filter ($.code == flowVars.variantId) map 
+payload.variantOptions 
+filter ($.code == flowVars.variantId) 
+map 
 using (productId = payload.code)
 {
 	productId:            productId,
 	identifier:           $.code,
-	pictures:             imageData.products[productId].variants[$.code].images,
+	pictures:             $.variantOptionQualifiers.image.url 
+                          when $.variantOptionQualifiers.image != null 
+                          otherwise [],
 	configuration:        $.variantOptionQualifiers map (variantOption) -> {
 		characteristic:{
 			code:         variantOption.qualifier,
