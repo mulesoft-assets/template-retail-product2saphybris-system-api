@@ -49,7 +49,6 @@ when flowVars.name != null
 otherwise payload]]></dw:set-payload>
         </dw:transform-message>
         <dw:transform-message doc:name="Final mapping">
-            <dw:input-payload doc:sample="sample_data/json_3.json"/>
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json 
 %var imageData = read(p('imageData'), "application/json")
@@ -108,9 +107,8 @@ otherwise payload]]></dw:set-payload>
 
     </flow>
     <flow name="get:/products/{productId}:product-system-api-config">
-        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" productCode="#[flowVars.productId]" doc:name="Hybris OCC Connector"/>
+        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector" productCode="#[flowVars.productId]" doc:name="Hybris OCC Connector"/>
         <dw:transform-message doc:name="Map Fields">
-            <dw:input-payload doc:sample="sample_data\ProductWsDTO_2.dwl"/>
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 %var imageData = read(p('imageData'), "application/json")
@@ -140,9 +138,8 @@ otherwise payload]]></dw:set-payload>
     </flow>
     
     <flow name="get:/products/{productId}/variants:product-system-api-config">
-        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" productCode="#[flowVars.productId]" doc:name="Hybris OCC Connector" doc:description="When Id is not found, connector throws exception org.mule.modules.hybris.exception.HybrisConnectorException"/>
+        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector" productCode="#[flowVars.productId]" doc:name="Hybris OCC Connector" doc:description="When Id is not found, connector throws exception org.mule.modules.hybris.exception.HybrisConnectorException"/>
         <dw:transform-message doc:name="Map Fields">
-            <dw:input-payload doc:sample="sample_data/json.json"/>
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 %var imageData = read(p('imageData'), "application/json")
@@ -169,20 +166,10 @@ variants: payload.variantOptions map {
 
     </flow>
     <flow name="get:/products/{productId}/variants/{variantId}:product-system-api-config">
-        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" productCode="#[flowVars.productId]" doc:name="Hybris OCC Connector"/>
-<!--         <enricher source="#[payload]" target="#[flowVars.existing_variantIDs]" doc:name="Message Enricher"> -->
-<!--             <dw:transform-message doc:name="Get variant ID's"> -->
-<!--                 <dw:set-payload><![CDATA[%dw 1.0 -->
-<!-- %output application/java -->
-<!-- - - - -->
-<!-- payload.variantOptions map $.code]]></dw:set-payload> -->
-<!--             </dw:transform-message> -->
-<!--         </enricher> -->
+        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector" productCode="#[flowVars.productId]" doc:name="Hybris OCC Connector"/>
         <choice doc:name="Does variant exist?">
             <when expression="#[ dw(' (payload.variantOptions != null) and (payload.variantOptions.*code contains flowVars.variantId) ') ]">
                 <dw:transform-message doc:name="Map Fields">
-                    <dw:input-payload doc:sample="sample_data\ProductWsDTO_3.dwl"/>
-                    <dw:input-variable doc:sample="sample_data\string_4.dwl" variableName="variantId"/>
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 ---

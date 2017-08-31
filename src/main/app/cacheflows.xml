@@ -43,7 +43,7 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
         </choice>
     </flow>
     <sub-flow name="getCategories">
-        <hybris:get-catalogs config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" doc:name="Hybris OCC Connector"/>
+        <hybris:get-catalogs config-ref="Hybris_OCC_Connector" doc:name="Hybris OCC Connector"/>
         <dw:transform-message doc:name="transform to required format">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
@@ -77,9 +77,9 @@ firstLevelCategories ++ secondLevelCategories]]></dw:set-payload>
         <logger message="#[payload]" level="INFO" doc:name="Logger"/>
     </sub-flow>
     <sub-flow name="getProducts">
-        <hybris:search-products config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" query=" " doc:name="Get products/variants"/>
+        <hybris:search-products config-ref="Hybris_OCC_Connector" query=" " doc:name="Get products/variants"/>
         <splitter expression="#[payload]" doc:name="Splitter"/>
-        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector__Customer_or_Customer_Manager" productCode="#[payload.code]" doc:name="Get product/variant details"/>
+        <hybris:get-product-by-code config-ref="Hybris_OCC_Connector" productCode="#[payload.code]" doc:name="Get product/variant details"/>
         <dw:transform-message doc:name="Convert to Map">
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/java

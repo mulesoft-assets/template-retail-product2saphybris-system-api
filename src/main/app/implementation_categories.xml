@@ -23,8 +23,6 @@ http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/jso
         <set-variable variableName="name" value="#[message.inboundProperties.'http.query.params'.name]" doc:name="Get name"/>
         <flow-ref name="getCatalogsCache" doc:name="getCatalogsCache"/>
         <dw:transform-message doc:name="Map Fields">
-            <dw:input-payload doc:sample="sample_data/json_1.json"/>
-            <dw:input-variable doc:sample="sample_data/string.dwl" variableName="name"/>
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 ---
@@ -44,7 +42,6 @@ http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/jso
         <set-variable variableName="categoryId" value="#[message.inboundProperties.'http.uri.params'.categoryId]" doc:name="Get categoryId"/>
         <flow-ref name="getCatalogsCache" doc:name="getCatalogsCache"/>
         <dw:transform-message doc:name="Filter by Id">
-            <dw:input-payload doc:sample="sample_data/json_2.json"/>
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/java
 %var filtered = payload filter ($.identifier == flowVars.categoryId)
@@ -78,7 +75,6 @@ filtered[0] when not filtered  is :empty otherwise null]]></dw:set-payload>
         <set-variable variableName="categoryId" value="#[message.inboundProperties.'http.uri.params'.categoryId]" doc:name="Get categoryId"/>
         <flow-ref name="getAllProductinfoCache" doc:name="getAllProductinfoCache"/>
         <dw:transform-message doc:name="Map to required structure">
-            <dw:input-payload doc:sample="sample_data\list_unknown.dwl"/>
             <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 %var imageData = read(p('imageData'), "application/json")
