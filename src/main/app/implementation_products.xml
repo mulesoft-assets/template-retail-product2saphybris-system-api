@@ -151,6 +151,17 @@ variants: payload.variantOptions map {
 	pictures:              $.variantOptionQualifiers.image.url 
                            when $.variantOptionQualifiers.image != null 
                            otherwise [],
+	price:{
+		amount:{
+			currency:        $.price.currencyIso when $.price != null otherwise "",
+			currencyValue:   $.price.value when $.price != null otherwise "",
+			name:            "Amount"
+		},
+	    salesUnit:{
+		    code:            "EA",
+		    name:            "EACH"
+		}
+	},
 	configuration:         $.variantOptionQualifiers map (variantOption) -> {
 		characteristic:{
 			code:          variantOption.qualifier,
@@ -185,6 +196,17 @@ using (productId = payload.code)
 	pictures:             $.variantOptionQualifiers.image.url 
                           when $.variantOptionQualifiers.image != null 
                           otherwise [],
+	price:{
+		amount:{
+			currency:        $.price.currencyIso when $.price != null otherwise "",
+			currencyValue:   $.price.value when $.price != null otherwise "",
+			name:            "Amount"
+		},
+	    salesUnit:{
+		    code:            "EA",
+		    name:            "EACH"
+		}
+	},                          
 	configuration:        $.variantOptionQualifiers map (variantOption) -> {
 		characteristic:{
 			code:         variantOption.qualifier,
