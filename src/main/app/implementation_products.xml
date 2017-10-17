@@ -151,6 +151,17 @@ variants: payload.variantOptions map {
 	pictures:              $.variantOptionQualifiers.image.url 
                            when $.variantOptionQualifiers.image != null 
                            otherwise [],
+	price:{
+		amount:{
+			currency:        $.priceData.currencyIso,
+			currencyValue:   $.priceData.value,
+			name:            "Amount"
+		},
+	    salesUnit:{
+		    code:            "EA",
+		    name:            "EACH"
+		}
+	},
 	configuration:         $.variantOptionQualifiers map (variantOption) -> {
 		characteristic:{
 			code:          variantOption.qualifier,
@@ -175,7 +186,7 @@ variants: payload.variantOptions map {
                     <dw:set-payload><![CDATA[%dw 1.0
 %output application/json
 ---
-payload.variantOptions 
+(payload.variantOptions 
 filter ($.code == flowVars.variantId) 
 map 
 using (productId = payload.code)
@@ -185,6 +196,17 @@ using (productId = payload.code)
 	pictures:             $.variantOptionQualifiers.image.url 
                           when $.variantOptionQualifiers.image != null 
                           otherwise [],
+	price:{
+		amount:{
+			currency:        $.priceData.currencyIso,
+			currencyValue:   $.priceData.value,
+			name:            "Amount"
+		},
+	    salesUnit:{
+		    code:            "EA",
+		    name:            "EACH"
+		}
+	},                          
 	configuration:        $.variantOptionQualifiers map (variantOption) -> {
 		characteristic:{
 			code:         variantOption.qualifier,
@@ -196,7 +218,7 @@ using (productId = payload.code)
 			name:         variantOption.value
 		}
 	} 	
-}]]></dw:set-payload>
+})[0]]]></dw:set-payload>
                 </dw:transform-message>
                 <logger message="#[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Log Information"/>
             </when>
