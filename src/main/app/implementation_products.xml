@@ -153,8 +153,8 @@ variants: payload.variantOptions map {
                            otherwise [],
 	price:{
 		amount:{
-			currency:        $.price.currencyIso when $.price != null otherwise "",
-			currencyValue:   $.price.value when $.price != null otherwise "",
+			currency:        $.priceData.currencyIso,
+			currencyValue:   $.priceData.value,
 			name:            "Amount"
 		},
 	    salesUnit:{
@@ -198,8 +198,8 @@ using (productId = payload.code)
                           otherwise [],
 	price:{
 		amount:{
-			currency:        $.price.currencyIso when $.price != null otherwise "",
-			currencyValue:   $.price.value when $.price != null otherwise "",
+			currency:        $.priceData.currencyIso,
+			currencyValue:   $.priceData.value,
 			name:            "Amount"
 		},
 	    salesUnit:{
